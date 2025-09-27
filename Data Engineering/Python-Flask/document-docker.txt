@@ -1,0 +1,7 @@
+For docker terminal:
+docker build -t <provide the name of the image> .
+
+for docker composer
+docker compose up
+docker compose up --build --force-recreate --no-deps web
+docker compose -f docker-compose.yml -f docker-compose.debug.yml up

@@ -1,0 +1,17 @@
+{
+    "env":"dev",
+    "orders":[
+            {"name": "order_id", "type": "integer", "nullable": true},
+            {"name": "order_date", "type": "string", "nullable": true},
+            {"name": "amount", "type": "integer", "nullable": true},
+            {"name": "payment_status", "type": "string", "nullable": true}
+            ],
+    "order_items":
+                [
+                {"name": "order_id", "type": "integer", "nullable": true},
+                {"name": "order_item_id", "type": "integer", "nullable": true},
+                {"name": "amount", "type": "integer", "nullable": true},
+                {"name": "discount_amount", "type": "float", "nullable": true},
+                {"name": "final_amount", "type": "float", "nullable": true}
+                ]
+}
