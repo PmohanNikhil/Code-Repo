@@ -1,6 +1,7 @@
 import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
+from pyspark.sql.window import Window
 from pyspark.sql.types import *
 import logging
 
@@ -17,51 +18,81 @@ try:
     spark = SparkSession.builder.appName("Raw Data Processing XML").getOrCreate()
 
     # Input paths
-    input_path_complex = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\raw_data\raw_data_complex_xml.csv"
-    input_path_large = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\raw_data\raw_data_large_xml.csv"
+    input_path_complex = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\raw_data\raw_complex\raw_data_complex_xml.json"
+    input_path_large = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\raw_data\raw_large\raw_data_large_xml.json"
 
     output_folder_complex = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\processed_data\complex.csv"
     output_folder_large = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\processed_data\large.csv"
 
-    # Create output directory if it doesn't exist
-    os.makedirs(os.path.dirname(output_folder_complex), exist_ok=True)
-    os.makedirs(os.path.dirname(output_folder_large), exist_ok=True)
 
     # ---------- Process Complex XML ----------
-    df_complex = spark.read.csv(input_path_complex, header=True)
-    df_large = spark.read.csv(input_path_large, header=True)
+    df_complex = spark.read.json(input_path_complex)
 
-    sample_complex = df_complex.first()["data"]
-    sample_large = df_large.first()["data"]
+    df_flattened = df_complex.withColumn("chapter", explode_outer("chapters.chapter"))
+    df_flattened = df_flattened.withColumn("author_bio_paragraph", 
+                                       explode_outer("author.biography.paragraph"))
+    
+    df_flattened = df_flattened.withColumn("chapter_content_paragraph", 
+                                        explode_outer("chapter.content.paragraph"))
+    
+    df_complex_flattened = df_flattened.select(
+        col("_category").alias("category"),
+        col("_isbn").alias("isbn"),
+        col("author.name.first").alias("author_first_name"),
+        col("author.name.last").alias("author_last_name"),
+        col("author_bio_paragraph"),
+        col("chapter.title").alias("chapter_title"),
+        col("chapter_content_paragraph"),
+        col("publisher.name").alias("publisher_name"),
+        col("publisher.location.city").alias("publisher_city"),
+        col("publisher.location.country").alias("publisher_country"),
+        col("title").alias("book_title")
+    )
 
-    print("Sample Complex XML:\n", sample_complex)
-    print("\nSample Large XML:\n", sample_large)
+    # df_complex_flattened.show(truncate=False)
 
-    print("Complex CSV first 10 rows:")
-    df_complex.show(100, truncate=False)
+    # ---------- Process Large XML ----------
+    df_large = spark.read.json(input_path_large)
 
-    df_combined = df_complex.agg(concat_ws("", collect_list("data")).alias("xml_data"))
+    df_flatten = df_large.withColumn("project", explode_outer("projects.project"))
 
-    xml_string = df_combined.collect()[0]["xml_data"]
-    print(xml_string[:500])
+    df_large_flatten = df_flatten.select(
+        col("id").alias("employee_id"),
+        col("firstName").alias("First_Name"),
+        col("lastName").alias("Last_Name"),
+        col("hiredate").alias("date_of_join"),
+        col("position").alias("designation"),
+        col("department"),
+        col("salary"),        
+        col("project.name").alias("project_name"),
+        col("project.startDate").alias("project_start_date"),
+        col("project.endDate").alias("project_end_date")
+    )
 
-    rdd = spark.sparkContext.parallelize([Row(value=xml_string)])
+    windowspec = Window.partitionBy(col("designation"),col("department")).orderBy(col("salary").desc())
+    windowspec_cumilative = Window.partitionBy(col("designation"),col("department")).orderBy(col("salary").desc()).rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
-    # Convert RDD to a DataFrame
-    df_raw_xml = spark.createDataFrame(rdd)
+    df_large_flatten = df_large_flatten.withColumn("cumilative_salary", sum("salary").over(windowspec_cumilative)) \
+                                        .withColumn("rank", rank().over(windowspec)) \
+                                        .withColumn("dense_rank", dense_rank().over(windowspec)) \
+                                        .withColumn("row_number", row_number().over(windowspec))
 
-    df_raw_xml.show(truncate=False)
+    df_large_flatten.select("designation","department","salary","cumilative_salary","rank","dense_rank","row_number").show(truncate=False)
 
-    df_parsed = spark.read \
-                .format("com.databricks.spark.xml") \
-                .option("rowTag", "book") \
-                .load(xml_string)
 
-    df_parsed.show(truncate=False)
-    df_parsed.printSchema()
+    # Save processed data
+    os.makedirs(output_folder_complex, exist_ok=True)
+    output_path_complex = os.path.join(output_folder_complex, "processed_data_complex_xml.csv")
+    os.makedirs(output_folder_large, exist_ok=True)
+    output_path_large = os.path.join(output_folder_large, "processed_data_large_xml.csv")
+    
 
-    # print("\nLarge CSV first 10 rows:")
-    # df_large.show(10, truncate=False)
+    df_complex_flattened.toPandas().to_csv(output_path_complex, index=False)
+    logger.info(f"Processed complex data saved to {output_path_complex}")
+
+    df_large_flatten.toPandas().to_csv(output_path_large, index=False)
+    logger.info(f"Processed large data saved to {output_path_large}")
+
 
 except Exception as e:
     logger.error(f"An error occurred: {e}", exc_info=True)
