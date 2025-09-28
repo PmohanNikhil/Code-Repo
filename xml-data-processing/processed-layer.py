@@ -21,8 +21,8 @@ try:
     input_path_complex = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\raw_data\raw_complex\raw_data_complex_xml.json"
     input_path_large = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\raw_data\raw_large\raw_data_large_xml.json"
 
-    output_folder_complex = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\processed_data\complex.csv"
-    output_folder_large = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\processed_data\large.csv"
+    output_folder_complex = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\processed_data\complex"
+    output_folder_large = r"C:\Users\pmoha\OneDrive\Desktop\GitRepositories\Code-Repo\xml-data-processing\processed_data\large"
 
 
     # ---------- Process Complex XML ----------
